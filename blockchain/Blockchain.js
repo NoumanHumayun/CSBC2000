@@ -83,7 +83,15 @@ class Blockchain {
      * Find nonce that satisfies our proof of work.
      */
     proofOfWork() {
-        //TODO
+        const prevHash = this.chain.length !== 0 ? this.chain[this.chain.length - 1].hash : '0';
+        const nonce = crypto.randomBytes(2).toString('hex');
+        // The resulting string will be twice as long as the random bytes you generate; 
+        // each byte encoded to hex is 2 characters. 2 bytes will be 4 characters of hex.
+        const hash = this.getHash(prevHash, this.pendingTransactions, nonce);
+        if(hash.startsWith('000'))
+            return nonce;
+        else 
+            return this.proofOfWork();
     }
 
     /**
@@ -93,7 +101,7 @@ class Blockchain {
         let tx_id_list = [];
         this.pendingTransactions.forEach((tx) => tx_id_list.push(tx.tx_id));
         let nonce = this.proofOfWork();
-        this.addBlock('0');
+        this.addBlock(nonce);
     }
 
 
@@ -109,7 +117,7 @@ class Blockchain {
             if(i == 0 && this.chain[i].hash !==this.getHash('0',[],'0')){
                 return false;
             }
-            if(i > 0 && this.chain[i].hash !== this.getHash(this.chain[i-1].hash, this.chain[i].transactions, '0')){
+            if(i > 0 && this.chain[i].hash !== this.getHash(this.chain[i-1].hash, this.chain[i].transactions, this.chain[i].nonce)){
                 return false;
             }
             if(i > 0 && this.chain[i].prevHash !== this.chain[i-1].hash){
@@ -143,5 +151,5 @@ simulateChain(BChain, 5, 3);
 module.exports = Blockchain;
 
 // uncomment these to run a simulation
-// console.dir(BChain,{depth:null});
-// console.log("******** Validity of this blockchain: ", BChain.chainIsValid());
+console.dir(BChain,{depth:null});
+console.log("******** Validity of this blockchain: ", BChain.chainIsValid());
