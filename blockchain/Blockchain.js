@@ -11,13 +11,14 @@ const uuid = require('uuid');
  * @hash represents the hash of the previous block
  */
 class Block {
-    constructor(index, transactions, prevHash, nonce, hash) {
+    constructor(index, transactions, prevHash, nonce, hash, merkelRoot) {
         this.index = index;
         this.timestamp = Math.floor(Date.now() / 1000);
         this.transactions = transactions;
         this.prevHash = prevHash;
         this.hash = hash;
         this.nonce = nonce;
+        this.merkelRoot = merkelRoot;
     }
 }
 
@@ -44,6 +45,7 @@ class Blockchain {
         this.chain = [];
         this.pendingTransactions = [];
         this.addBlock('0');
+        this.difficulty = '000';
     }
 
     /**
@@ -59,8 +61,9 @@ class Blockchain {
     addBlock(nonce) {
         let index = this.chain.length;
         let prevHash = this.chain.length !== 0 ? this.chain[this.chain.length - 1].hash : '0';
-        let hash = this.getHash(prevHash, this.pendingTransactions, nonce);
-        let block = new Block(index, this.pendingTransactions, prevHash, nonce, hash);
+        let merkelRoot = this.constructMerkleTree(this.pendingTransactions);    
+        let hash = this.getHash(prevHash, merkelRoot, nonce);
+        let block = new Block(index, this.pendingTransactions, prevHash, nonce, hash, merkelRoot);
 
         // reset pending txs
         this.pendingTransactions = [];
@@ -70,9 +73,8 @@ class Blockchain {
     /**
      * Gets the hash of a block.
      */
-    getHash(prevHash, txs, nonce) {
-        var encrypt = prevHash + nonce;
-        txs.forEach((tx) => { encrypt += tx.tx_id; });
+    getHash(prevHash, merkelRoot, nonce) {
+        var encrypt = prevHash + merkelRoot +  nonce;
         var hash=crypto.createHmac('sha256', "secret")
             .update(encrypt)
             .digest('hex');
@@ -87,8 +89,8 @@ class Blockchain {
         const nonce = crypto.randomBytes(2).toString('hex');
         // The resulting string will be twice as long as the random bytes you generate; 
         // each byte encoded to hex is 2 characters. 2 bytes will be 4 characters of hex.
-        const hash = this.getHash(prevHash, this.pendingTransactions, nonce);
-        if(hash.startsWith('000'))
+        const hash = this.getHash(prevHash, this.merkelRoot, nonce);
+        if(hash.startsWith(this.difficulty))
             return nonce;
         else 
             return this.proofOfWork();
@@ -126,11 +128,37 @@ class Blockchain {
         }
         return true;
     }
+    /**
+   * Takes a list of transaction as input and
+   * @param {TransactionList} transactionList
+   */
+
+ constructMerkleTree(transactionList) {
+  let merkelRoot = []
+
+    merkelRoot.unshift(transactionList);
+    merkelRoot.unshift(transactionList.map((t) => t.hash));
+  
+    while (merkelRoot[0].length > 1) {
+      let temp = [];
+  
+      for (let index = 0; index < merkelRoot[0].length; index += 2) {
+        if (index < merkelRoot[0].length - 1 && index % 2 == 0)
+        temp.push(crypto.createHmac('sha256', "secret")
+        .update(merkelRoot[0][index] + merkelRoot[0][index + 1])
+        .digest('hex'))
+          
+        else temp.push(crypto.createHmac('sha256', "secret")
+        .update(merkelRoot[0][index])
+        .digest('hex'));
+      }
+      merkelRoot.unshift(temp);
+    }
+    
+    return merkelRoot[0][0];
+  }
 }
 
-function constructMerkleTree(inputs) {
-    //TODO
-}
 
 function simulateChain(blockchain, numTxs, numBlocks) {
     for(let i = 0; i < numBlocks; i++) {
